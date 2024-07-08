@@ -4,6 +4,10 @@
 	commit-collection\
 	clobber-today
 
+ifeq ($(COLLECTION_CONFIG_URL),)
+COLLECTION_CONFIG_URL=$(CONFIG_URL)collection/$(COLLECTION_NAME)/
+endif
+
 ifeq ($(COLLECTION_DIR),)
 COLLECTION_DIR=collection/
 endif
@@ -13,13 +17,21 @@ RESOURCE_DIR=$(COLLECTION_DIR)resource/
 endif
 
 ifeq ($(DATASTORE_URL),)
-DATASTORE_URL=https://$(COLLECTION_DATASET_BUCKET_NAME).s3.eu-west-2.amazonaws.com/
+DATASTORE_URL=https://files.planning.data.gov.uk/
 endif
 
 
 # data sources
 SOURCE_CSV=$(COLLECTION_DIR)source.csv
 ENDPOINT_CSV=$(COLLECTION_DIR)endpoint.csv
+OLD_RESOURCE_CSV=$(COLLECTION_DIR)old-resource.csv
+
+ifeq ($(COLLECTION_CONFIG_FILES),)
+COLLECTION_CONFIG_FILES=\
+	$(SOURCE_CSV)\
+	$(ENDPOINT_CSV)\
+	$(OLD_RESOURCE_CSV)
+endif
 
 # collection log
 LOG_DIR=$(COLLECTION_DIR)log/
@@ -30,16 +42,26 @@ COLLECTION_INDEX=\
 	$(COLLECTION_DIR)/log.csv\
 	$(COLLECTION_DIR)/resource.csv
 
+init::
+	@curl -o /dev/null -s -w "%{http_code}" '$(DATASTORE_URL)$(REPOSITORY)/$(COLLECTION_DIR)log.csv' > /tmp/log_status_code
+	@curl -o /dev/null -s -w "%{http_code}" '$(DATASTORE_URL)$(REPOSITORY)/$(COLLECTION_DIR)resource.csv' > /tmp/resource_status_code
+	@if [ $$(cat /tmp/log_status_code) -ne 403 ] && [ $$(cat /tmp/resource_status_code) -ne 403 ]; then \
+		curl -qfsL '$(DATASTORE_URL)$(REPOSITORY)/$(COLLECTION_DIR)log.csv' > $(COLLECTION_DIR)log.csv; \
+		curl -qfsL '$(DATASTORE_URL)$(REPOSITORY)/$(COLLECTION_DIR)resource.csv' > $(COLLECTION_DIR)resource.csv; \
+	fi
+	@rm -f /tmp/log_status_code /tmp/resource_status_code
+
+
 first-pass:: collect
 
 second-pass:: collection
 
-collect:: $(SOURCE_CSV) $(ENDPOINT_CSV)
+collect:: $(COLLECTION_CONFIG_FILES)
 	@mkdir -p $(RESOURCE_DIR)
-	digital-land collect $(ENDPOINT_CSV)
+	digital-land ${DIGITAL_LAND_OPTS} collect $(ENDPOINT_CSV)
 
 collection::
-	digital-land collection-save-csv
+	digital-land ${DIGITAL_LAND_OPTS} collection-save-csv
 
 clobber-today::
 	rm -rf $(LOG_FILES_TODAY) $(COLLECTION_INDEX)
@@ -48,7 +70,7 @@ makerules::
 	curl -qfsL '$(SOURCE_URL)/makerules/main/collection.mk' > makerules/collection.mk
 
 commit-collection::
-	git add collection
+	git add collection/log
 	git diff --quiet && git diff --staged --quiet || (git commit -m "Collection $(shell date +%F)"; git push origin $(BRANCH))
 
 load-resources::
@@ -56,6 +78,9 @@ load-resources::
 
 save-resources::
 	aws s3 sync $(RESOURCE_DIR) s3://$(COLLECTION_DATASET_BUCKET_NAME)/$(REPOSITORY)/$(RESOURCE_DIR) --no-progress
+
+save-logs::
+	aws s3 sync $(COLLECTION_DIR)log s3://$(COLLECTION_DATASET_BUCKET_NAME)/$(REPOSITORY)/$(COLLECTION_DIR)log --no-progress
 
 save-collection::
 	aws s3 cp $(COLLECTION_DIR)log.csv s3://$(COLLECTION_DATASET_BUCKET_NAME)/$(REPOSITORY)/$(COLLECTION_DIR) --no-progress
@@ -69,3 +94,12 @@ endif
 collection/resource/%:
 	@mkdir -p collection/resource/
 	curl -qfsL '$(DATASTORE_URL)$(REPOSITORY)/$(RESOURCE_DIR)$(notdir $@)' > $@
+
+collection/%.csv:
+	@mkdir -p $(COLLECTION_DIR)
+	curl -qfsL '$(COLLECTION_CONFIG_URL)$(notdir $@)' > $@
+
+config:: $(COLLECTION_CONFIG_FILES)
+
+clean::
+	rm -f $(COLLECTION_CONFIG_FILES)
