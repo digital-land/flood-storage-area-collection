@@ -7,17 +7,6 @@ A collection of flood storage areas collected from the Environment Agency.
 
 The national dataset is in a format consistent with other Digital Land datasets as defined by the [flood-storage-area schema](https://github.com/digital-land/specification/blob/main/content/dataset/flood-storage-area.md?plain=1).
 
-# Collection
-
-* [collection/source.csv](collection/source.csv) — the list of data sources by organisation, see [specification/source](https://digital-land.github.io/specification/schema/source/)
-* [collection/endpoint.csv](collection/endpoint.csv) — the list of endpoint URLs for the collection, see [specification/endpoint](https://digital-land.github.io/specification/schema/endpoint)
-* [collection/resource/](collection/resource/) — collected resources
-
-*These files are now stored in AWS S3:*
-
-* [collection/log/](https://files.planning.data.gov.uk/flood-storage-area-collection/collection/log/) — individual log JSON files, created by the collection process
-* [collection/log.csv](https://files.planning.data.gov.uk/flood-storage-area-collection/collection/log.csv) — a collection log assembled from the individual log files, see [specification/log](https://files.planning.data.gov.uk/flood-storage-area-collection/https://digital-land.github.io/specification/schema/log)
-* [collection/resource.csv](https://files.planning.data.gov.uk/flood-storage-area-collection/collection/resource.csv) — a list of collected resources, see [specification/resource](https://files.planning.data.gov.uk/flood-storage-area-collection/https://digital-land.github.io/specification/schema/resource)
 
 # Updating the collection
 
